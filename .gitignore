@@ -38,3 +38,7 @@ runs/
 
 # Local editor / tool settings (machine-specific)
 .claude/
+
+# Portfolio overview PDF (website asset, not committed)
+/LiftLab_portfolio_overview.pdf
+/LiftLab_Project_Overview.pdf
