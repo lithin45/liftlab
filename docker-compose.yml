@@ -1,0 +1,45 @@
+# `docker compose up` brings up the full stack:
+#   1. `pipeline` (the library/sim image) builds the data warehouse via DuckDB+dbt,
+#      runs the synthetic experiment simulation, and the validation eval, then exits.
+#   2. `app` (the same image) serves the Streamlit "experiment report card" once the
+#      pipeline has completed successfully.
+#
+# Shared bind mounts let the freshly-built warehouse + run artifacts flow from the
+# pipeline service to the UI service and persist on the host.
+
+services:
+  pipeline:
+    build:
+      context: .
+    image: liftlab:latest
+    command: ["python", "-m", "liftlab.cli", "pipeline"]
+    environment:
+      - LIFTLAB_DUCKDB=/app/data/warehouse/liftlab.duckdb
+      - DBT_PROFILES_DIR=/app/dbt
+    volumes:
+      - ./config:/app/config
+      - ./data:/app/data
+      - ./runs:/app/runs
+
+  app:
+    image: liftlab:latest
+    build:
+      context: .
+    command:
+      - streamlit
+      - run
+      - src/liftlab/ui/app.py
+      - --server.port=8501
+      - --server.address=0.0.0.0
+    environment:
+      - LIFTLAB_DUCKDB=/app/data/warehouse/liftlab.duckdb
+      - DBT_PROFILES_DIR=/app/dbt
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./config:/app/config
+      - ./data:/app/data
+      - ./runs:/app/runs
+    depends_on:
+      pipeline:
+        condition: service_completed_successfully

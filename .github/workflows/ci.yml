@@ -1,0 +1,65 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "0.11.23"
+          enable-cache: true
+
+      - name: Pin Python
+        run: uv python install 3.11
+
+      - name: Sync dependencies (frozen, incl. causal + ui for the full suite)
+        run: uv sync --frozen --group causal --group ui
+
+      - name: Lint (ruff)
+        run: uv run ruff check .
+
+      - name: Format check (ruff)
+        run: uv run ruff format --check .
+
+      - name: Build data layer (synthetic population -> DuckDB -> dbt)
+        env:
+          LIFTLAB_DATA_SOURCE: synthetic
+        run: uv run liftlab build
+
+      - name: Run tests
+        run: uv run pytest -ra
+
+      # The validation gates: estimator coverage >= 95%, A/A FPR ~= 5%,
+      # CUPED variance reduction >= 30%, SRM detection. `liftlab eval` exits
+      # non-zero if any gate is missed. Enabled from Phase 5 onward.
+      - name: Validation gates (make eval)
+        run: uv run liftlab eval
+
+  # Proves the advertised one-command path (`docker compose up`) actually builds and
+  # that the data layer runs inside the container. Runs in parallel with `test`.
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate uv.lock presence check
+        run: test -f uv.lock
+
+      - name: Build the image
+        run: docker compose build
+
+      - name: Smoke-run the data layer inside the container
+        run: docker compose run --rm -e LIFTLAB_DATA_SOURCE=synthetic pipeline python -m liftlab.cli build

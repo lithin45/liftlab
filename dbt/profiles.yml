@@ -1,0 +1,10 @@
+# dbt-duckdb profile. The warehouse path comes from the LIFTLAB_DUCKDB env var,
+# which `liftlab build` (and the Docker image) set to the absolute warehouse path.
+liftlab:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: "{{ env_var('LIFTLAB_DUCKDB') }}"
+      threads: 4
+      schema: main

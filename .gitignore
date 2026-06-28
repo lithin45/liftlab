@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# uv / virtualenv
+.venv/
+venv/
+
+# dbt
+dbt/target/
+dbt/dbt_packages/
+dbt/logs/
+dbt/.user.yml
+logs/
+
+# Data artifacts (large / regenerable). Keep the dirs via .gitkeep.
+data/raw/*
+!data/raw/.gitkeep
+data/warehouse/*
+!data/warehouse/.gitkeep
+
+# Simulation / run outputs
+runs/
+*.duckdb
+*.duckdb.wal
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+
+# Local editor / tool settings (machine-specific)
+.claude/

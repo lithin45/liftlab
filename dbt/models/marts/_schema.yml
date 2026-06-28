@@ -1,0 +1,28 @@
+version: 2
+
+models:
+  - name: customer_metrics
+    description: >
+      One row per customer with pre/post-cutoff order aggregates. The Phase 1
+      experiment fact table (smoke test); substrate for the synthetic experiment.
+    columns:
+      - name: customer_unique_id
+        description: Stable customer identifier (grain of this table).
+        data_tests:
+          - not_null
+          - unique
+      - name: n_orders
+        description: Total orders by the customer.
+        data_tests:
+          - not_null
+      - name: total_value
+        description: Lifetime order value (price + freight).
+        data_tests:
+          - not_null
+      - name: post_converted
+        description: 1 if the customer transacted in the post-cutoff period.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [0, 1]

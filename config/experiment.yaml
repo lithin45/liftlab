@@ -1,0 +1,97 @@
+# ============================================================================
+# LiftLab experiment configuration
+# ============================================================================
+# This file is the single source of truth for the synthetic experiment design.
+#
+# IMPORTANT DISCLOSURE: LiftLab does NOT run on a real-world experiment.
+#   1. The *population substrate* may be the real Olist e-commerce dataset
+#      (CC BY-NC-SA 4.0, non-commercial) OR a synthetic stand-in generated
+#      locally when Kaggle credentials are unavailable (see `data.source`).
+#   2. The *treatment effect* is ALWAYS synthetic and injected by us. Because we
+#      inject it, the TRUE effect is known, which is what lets the validation
+#      harness prove every estimator recovers the truth. The true effect is
+#      surfaced in the README and the Streamlit report card so the project is
+#      never mistaken for a real experiment.
+# ============================================================================
+
+# Global RNG seed. Everything downstream derives from this for reproducibility.
+seed: 20240601
+
+data:
+  # source: how to obtain the population substrate.
+  #   "auto"      -> try Kaggle (needs CLI + creds); fall back to synthetic.
+  #   "kaggle"    -> require the real Olist dataset; error if unavailable.
+  #   "synthetic" -> always generate the local synthetic population.
+  source: "auto"
+  kaggle_dataset: "olistbr/brazilian-ecommerce"
+
+  # Synthetic population parameters (used when the real data is unavailable).
+  synthetic:
+    n_customers: 20000
+    start_date: "2017-01-01"
+    end_date: "2018-12-31"
+
+  # Date that splits each customer's history into a pre-period (covariate)
+  # and a post-period (outcome). Chosen to split the real Olist span sensibly.
+  cutoff_date: "2018-01-01"
+
+experiment:
+  name: "checkout_redesign_v1"
+  unit: "customer"            # randomization unit
+  assignment_ratio: 0.5       # intended P(unit -> treatment)
+
+  # Units drawn from the population for one experiment (capped at the population size;
+  # sampled without replacement when <= population, else with replacement).
+  sample_size: 20000
+
+  # Pre-period covariate used by CUPED. The simulator calibrates the outcome so that
+  # corr(covariate, continuous outcome) == target_correlation, which makes CUPED's
+  # variance reduction == target_correlation^2 (~36% here) by construction.
+  covariate:
+    name: "pre_period_value"
+    target_correlation: 0.6
+
+  # Two metrics share one experiment draw. Each true effect is the DISCLOSED ground
+  # truth the estimators must recover.
+  metrics:
+    # Continuous revenue-per-user metric, the CUPED variance-reduction headline.
+    revenue:
+      name: "revenue_per_user"
+      type: "continuous"
+      baseline_mean: 50.0         # control-group mean (BRL)
+      outcome_sd: 40.0            # total outcome standard deviation
+      true_effect_absolute: 2.0   # injected ATE in BRL (the known truth)
+    # Binary conversion metric, a clean homogeneous-Bernoulli two-proportion test + SRM.
+    # covariate_coef=0 keeps the conversion outcome covariate-independent so the naive
+    # two-proportion estimator attains ~nominal coverage (CUPED's variance-reduction story
+    # lives on the continuous revenue metric, its canonical use case).
+    conversion:
+      name: "post_conversion"
+      type: "proportion"
+      base_rate: 0.20             # control conversion probability
+      true_lift_absolute: 0.02    # injected ATE = P(Y|T) - P(Y|C) (the known truth)
+      covariate_coef: 0.0
+
+power:
+  alpha: 0.05
+  power: 0.80
+
+# Validation harness (Phase 5). Monte-Carlo settings for the eval gates.
+validation:
+  # Replicate count. Larger M shrinks the sampling noise in the gate estimates so a
+  # correct engine doesn't flap.
+  n_simulations: 3000
+  coverage_target: 0.95       # nominal CI coverage (the design target)
+  # A correctly-calibrated estimator's TRUE coverage sits AT or just-below nominal at
+  # finite N (~0.945-0.950 here), so a hard "observed >= 0.95" gate is statistically
+  # unpassable (it would reject a correct engine ~half the time, and MORE as M grows).
+  # The gate therefore requires coverage above a finite-sample FLOOR (nominal minus a
+  # ~1% allowance), with an MC-noise margin:
+  #   observed >= coverage_floor - coverage_mc_sigma * sqrt(floor*(1-floor)/M).
+  # This reliably passes correct estimators while still failing genuinely-broken ones (<~0.93).
+  coverage_floor: 0.94
+  coverage_mc_sigma: 2.33
+  aa_fpr_tolerance: 0.02      # |observed A/A FPR - alpha| must be within this band (~5 MC-SE at M=3000)
+  cuped_min_variance_reduction: 0.30  # CUPED must cut variance by >= 30%
+  srm_imbalance_ratio: 0.55   # intentionally-broken ratio the SRM check must flag
+  srm_alpha: 0.001            # SRM chi-square p-value threshold (strict, to avoid false alarms)

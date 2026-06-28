@@ -1,0 +1,15 @@
+version: 2
+
+sources:
+  - name: olist
+    description: >
+      Raw Olist-shaped tables loaded into DuckDB's `raw` schema by
+      liftlab.data.warehouse. May be the real Olist e-commerce dataset
+      (CC BY-NC-SA 4.0, non-commercial) or a disclosed synthetic stand-in.
+    schema: raw
+    tables:
+      - name: olist_customers_dataset
+      - name: olist_orders_dataset
+      - name: olist_order_items_dataset
+      - name: olist_order_payments_dataset
+      - name: olist_order_reviews_dataset
